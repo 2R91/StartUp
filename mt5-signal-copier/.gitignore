@@ -1,0 +1,6 @@
+config.toml
+*.session
+*.session-journal
+trades.json
+copier.log
+__pycache__/

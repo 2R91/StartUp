@@ -1,0 +1,42 @@
+# Copie ce fichier en config.toml puis remplis-le. Ne partage jamais config.toml.
+
+[mt5]
+# Laisse login = 0 pour utiliser le compte déjà connecté dans le terminal MT5.
+login = 0
+password = ""
+server = ""          # ex. "ICMarketsSC-Demo"
+path = ""            # optionnel : C:\\Program Files\\MetaTrader 5\\terminal64.exe
+
+[trading]
+dry_run = true                 # true = simulation (order_check), false = ordres réels
+magic = 20261109               # identifie les positions ouvertes par le copieur
+lot_mode = "risk"              # "fixed" (fixed_lot) ou "risk" (% du solde risqué jusqu'au SL)
+fixed_lot = 0.01
+risk_percent = 1.0
+max_lot = 1.0                  # plafond de sécurité
+require_sl = true              # refuse les signaux sans stop loss
+multi_tp = "split"             # "split" : 1 position par TP | "first" | "last"
+max_open_positions = 5         # 0 = illimité
+max_entry_distance_points = 0  # refuse si le prix s'est trop éloigné de l'entrée annoncée (0 = off)
+deviation_points = 20          # slippage maximum accepté
+symbol_suffix = ""             # ex. ".m" ou "pro" si ton broker nomme XAUUSD "XAUUSD.m"
+allowed_symbols = []           # ex. ["XAUUSD", "EURUSD"] ; vide = tous
+extra_symbols = []             # symboles non standards à reconnaître, ex. ["BOOM1000"]
+state_file = "trades.json"
+
+[symbol_map]
+# Nom canonique = nom chez ton broker (prioritaire sur symbol_suffix)
+# XAUUSD = "GOLD"
+# NAS100 = "USTEC"
+
+[aliases]
+# Mot utilisé par ton canal = symbole canonique
+# CABLE = "GBPUSD"
+
+[telegram]
+# Clés à créer sur https://my.telegram.org > API development tools
+api_id = 0
+api_hash = ""
+session = "copier"
+# Noms d'utilisateur (@ sans le @) ou IDs numériques (voir --list-chats)
+channels = ["nom_du_canal"]
