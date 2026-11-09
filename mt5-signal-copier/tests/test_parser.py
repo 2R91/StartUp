@@ -47,6 +47,13 @@ class OpenSignals(unittest.TestCase):
         s = parse_signal("SELL CABLE SL 1.30 TP 1.28", aliases={"CABLE": "GBPUSD"})
         self.assertEqual(s.symbol, "GBPUSD")
 
+    def test_real_channel_nasdaq(self):
+        s = parse_signal("🔴 SELL NASDAQ \n\n📉 PE  : 26850 \n\n🛑 SL : 26960 -110\n\n"
+                         "🎯 TP1 : 26750\n🎯 TP2 : 26530\n🎯 TP3 : 26230\n\n⚠️ MONEY MANAGEMENT\n"
+                         "Risque maximum : 1 % du capital.\n☑️ À TP1 : Half + BE obligatoire.")
+        self.assertEqual((s.action, s.side, s.symbol, s.order_kind), ("OPEN", "SELL", "NAS100", "MARKET"))
+        self.assertEqual((s.entry, s.sl, s.tps), (26850.0, 26960.0, [26750.0, 26530.0, 26230.0]))
+
     def test_level_validation(self):
         s = parse_signal("BUY XAUUSD SL 2660 TP 2640")
         self.assertTrue(s.check_levels(2650))

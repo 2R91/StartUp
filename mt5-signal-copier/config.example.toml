@@ -16,8 +16,12 @@ risk_percent = 1.0
 max_lot = 1.0                  # plafond de sécurité
 require_sl = true              # refuse les signaux sans stop loss
 multi_tp = "split"             # "split" : 1 position par TP | "first" | "last"
+tp_split = [0.5, 0.25, 0.25]   # part du lot par TP (« Half à TP1 ») ; [] = parts égales
+breakeven_after_tp1 = true     # SL des positions restantes au prix d'entrée dès que TP1 est touché
+shift_levels_to_broker = true  # décalage de cotation : recale SL/TP sur le prix du broker
 max_open_positions = 5         # 0 = illimité
 max_entry_distance_points = 0  # refuse si le prix s'est trop éloigné de l'entrée annoncée (0 = off)
+                               # ex. 3000 sur NAS100 (point 0.01) = 30 points d'indice
 deviation_points = 20          # slippage maximum accepté
 symbol_suffix = ""             # ex. ".m" ou "pro" si ton broker nomme XAUUSD "XAUUSD.m"
 allowed_symbols = []           # ex. ["XAUUSD", "EURUSD"] ; vide = tous
@@ -40,3 +44,4 @@ api_hash = ""
 session = "copier"
 # Noms d'utilisateur (@ sans le @) ou IDs numériques (voir --list-chats)
 channels = ["nom_du_canal"]
+manage_interval_seconds = 5    # fréquence de vérification du TP1 pour le break-even

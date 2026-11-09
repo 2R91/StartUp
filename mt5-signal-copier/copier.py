@@ -87,6 +87,16 @@ def run_telegram(copier: Copier, tcfg: dict, list_chats: bool) -> None:
             reply = tag_for(event.chat_id, msg.reply_to_msg_id) if msg.reply_to_msg_id else None
             copier.on_message(msg.message or "", tag_for(event.chat_id, msg.id), reply)
 
+        async def manage_loop() -> None:
+            while True:
+                try:
+                    copier.executor.manage()
+                except Exception:
+                    log.exception("Erreur pendant le suivi des positions")
+                await asyncio.sleep(interval)
+
+        interval = float(tcfg.get("manage_interval_seconds", 5))
+        manager = asyncio.create_task(manage_loop())  # noqa: F841 (garde une référence)
         log.info("En écoute sur %s", ", ".join(map(str, channels)))
         await client.run_until_disconnected()
 

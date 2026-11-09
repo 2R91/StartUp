@@ -56,6 +56,18 @@ dans le terminal), clés Telegram, canaux à écouter, gestion du risque.
 Les messages sans intérêt (`TP1 hit 🔥`, `Good morning`…) sont ignorés. Surnoms gérés : GOLD, SILVER,
 NASDAQ/US100, DOW/US30, SPX/US500, DAX/GER40, WTI/OIL, BTC… Tu peux en ajouter dans `[aliases]`.
 
+## Gestion automatique après l'entrée
+
+Pour un canal qui demande « À TP1 : Half + BE » (comme `🔴 SELL NASDAQ / PE : 26850 / SL : 26960 / TP1…TP3`) :
+
+- `tp_split = [0.5, 0.25, 0.25]` : 50 % du lot sort à TP1, 25 % à TP2, 25 % à TP3.
+- `breakeven_after_tp1 = true` : dès que la position TP1 est clôturée **par son TP**, le SL des positions
+  restantes passe au prix d'entrée (vérifié toutes les `manage_interval_seconds`).
+- `shift_levels_to_broker = true` : si le canal annonce 26850 et que ton broker cote 26860, SL et TP sont
+  décalés de +10. Les distances (et donc le risque) restent celles du signal.
+
+Pense à `[symbol_map] NAS100 = "..."` avec le nom exact chez ton broker (USTEC, US100, NAS100.cash…).
+
 ## Sécurités intégrées
 
 - `dry_run = true` par défaut.

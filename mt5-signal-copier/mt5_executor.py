@@ -106,6 +106,14 @@ class MT5Executor:
                 log.warning("Ignoré : le prix (%s) est à %.0f points de l'entrée annoncée (%s)",
                             market, dist, sig.entry)
                 return
+        if not pending and sig.entry is not None and cfg.get("shift_levels_to_broker", False):
+            # Décalage de cotation : on garde les mêmes distances SL/TP que le signal,
+            # mais recalées sur le prix réel du broker.
+            offset = market - sig.entry
+            if offset:
+                sig.sl = sig.sl + offset if sig.sl is not None else None
+                sig.tps = [tp + offset for tp in sig.tps]
+                log.info("Niveaux décalés de %+.*f pour coller au prix du broker", info.digits, offset)
         errors = sig.check_levels(price)
         if errors:
             log.warning("Ignoré : niveaux incohérents : %s", "; ".join(errors))
@@ -174,11 +182,50 @@ class MT5Executor:
         if mode == "last":
             return [(total, tps[-1])]
         if mode == "split":
-            for n in range(len(tps), 1, -1):
-                per_leg = self._round_volume(total / n, info)
-                if per_leg:
-                    return [(per_leg, tp) for tp in tps[:n]]
+            weights = [float(w) for w in self.cfg.get("tp_split", [])] or [1.0] * len(tps)
+            weights += [weights[-1]] * (len(tps) - len(weights))
+            for n in range(len(tps), 1, -1):  # moins de TP si le lot est trop petit
+                w = weights[:n]
+                volumes = [self._round_volume(total * x / sum(w), info) for x in w]
+                if all(volumes):
+                    return list(zip(volumes, tps[:n]))
         return [(total, tps[0])]
+
+    # ------------------------------------------------------------------ suivi automatique
+    def manage(self) -> None:
+        """À appeler régulièrement : SL au prix d'entrée dès que TP1 est touché."""
+        if not self.connected:
+            return
+        open_positions = {p.ticket: p for p in self._positions()}
+        open_orders = {o.ticket for o in mt5.orders_get() or () if o.magic == self.magic}
+        changed = False
+        for tag, tickets in list(self.trades.items()):
+            alive = [t for t in tickets if t in open_positions or t in open_orders]
+            if not alive:
+                del self.trades[tag]  # trade entièrement terminé
+                changed = True
+                continue
+            first = tickets[0]
+            if (not self.cfg.get("breakeven_after_tp1", False) or len(tickets) < 2
+                    or first in alive or not self._closed_at_tp(first)):
+                continue
+            for t in alive:
+                if t in open_positions:
+                    self._move_to_breakeven(open_positions[t], f"TP1 touché [{tag}]")
+        if changed:
+            self._save_state()
+
+    def _closed_at_tp(self, ticket: int) -> bool:
+        deals = mt5.history_deals_get(position=ticket) or ()
+        return any(d.entry == mt5.DEAL_ENTRY_OUT and d.reason == mt5.DEAL_REASON_TP for d in deals)
+
+    def _move_to_breakeven(self, p, why: str) -> None:
+        is_buy = p.type == mt5.POSITION_TYPE_BUY
+        if p.sl and (p.sl >= p.price_open if is_buy else p.sl <= p.price_open):
+            return  # déjà au BE ou mieux
+        self._send({"action": mt5.TRADE_ACTION_SLTP, "symbol": p.symbol,
+                    "position": p.ticket, "sl": p.price_open, "tp": p.tp},
+                   f"SL au prix d'entrée {p.symbol} #{p.ticket} ({why})")
 
     # ------------------------------------------------------------------ gestion
     def _close(self, sig: Signal, reply_tag: str | None) -> None:
@@ -217,12 +264,7 @@ class MT5Executor:
         if targets is None:
             return
         for p in targets[0]:
-            is_buy = p.type == mt5.POSITION_TYPE_BUY
-            if p.sl and (p.sl >= p.price_open if is_buy else p.sl <= p.price_open):
-                continue  # déjà au BE ou mieux
-            self._send({"action": mt5.TRADE_ACTION_SLTP, "symbol": p.symbol,
-                        "position": p.ticket, "sl": p.price_open, "tp": p.tp},
-                       f"SL au prix d'entrée {p.symbol} #{p.ticket}")
+            self._move_to_breakeven(p, "demandé par le canal")
 
     def _targets(self, sig: Signal, reply_tag: str | None):
         """Positions/ordres visés : ceux du signal d'origine (réponse), d'un symbole, ou tous."""
