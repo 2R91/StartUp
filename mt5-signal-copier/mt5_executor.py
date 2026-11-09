@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import math
+import time
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 from signal_parser import Signal
@@ -30,6 +32,7 @@ class MT5Executor:
         self.dry_run = bool(trading_cfg.get("dry_run", True))
         self.magic = int(trading_cfg.get("magic", 20261109))
         self.connected = False
+        self._last_contract: dict[str, str] = {}
         self.state_path = Path(trading_cfg.get("state_file", "trades.json"))
         self.trades: dict[str, list[int]] = self._load_state()
 
@@ -268,18 +271,18 @@ class MT5Executor:
 
     def _targets(self, sig: Signal, reply_tag: str | None):
         """Positions/ordres visés : ceux du signal d'origine (réponse), d'un symbole, ou tous."""
-        symbol = self._broker_symbol(sig.symbol) if sig.symbol else None
+        pattern = self._symbol_pattern(sig.symbol) if sig.symbol else None
+        in_scope = lambda x: pattern is None or fnmatchcase(x.symbol, pattern)  # noqa: E731
         if reply_tag:
             tickets = set(self.trades.get(reply_tag, []))
             match = lambda x: x.ticket in tickets or x.comment == reply_tag[:31]  # noqa: E731
-        elif symbol or sig.close_all:
+        elif pattern or sig.close_all:
             match = lambda x: True  # noqa: E731
         else:
             log.warning("%s ignoré : ni symbole, ni réponse à un signal, ni « ALL »", sig.action)
             return None
-        positions = [p for p in self._positions(symbol) if match(p)]
-        orders = [o for o in (mt5.orders_get(symbol=symbol) if symbol else mt5.orders_get()) or ()
-                  if o.magic == self.magic and match(o)]
+        positions = [p for p in self._positions() if in_scope(p) and match(p)]
+        orders = [o for o in mt5.orders_get() or () if o.magic == self.magic and in_scope(o) and match(o)]
         return positions, orders
 
     # ------------------------------------------------------------------ utilitaires
@@ -287,12 +290,34 @@ class MT5Executor:
         positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
         return [p for p in positions or () if p.magic == self.magic]
 
+    def _symbol_pattern(self, canonical: str) -> str:
+        return self.symbol_map.get(canonical.upper(), canonical + self.cfg.get("symbol_suffix", ""))
+
     def _broker_symbol(self, canonical: str) -> str | None:
-        symbol = self.symbol_map.get(canonical.upper(), canonical + self.cfg.get("symbol_suffix", ""))
+        symbol = self._symbol_pattern(canonical)
+        if "*" in symbol:
+            symbol = self._current_contract(symbol)
+            if not symbol:
+                return None
         if not mt5.symbol_select(symbol, True):
             log.error("Symbole %s introuvable chez le broker (voir [symbol_map] / symbol_suffix)", symbol)
             return None
         return symbol
+
+    def _current_contract(self, pattern: str) -> str | None:
+        """Contrats à échéance (ex. "US100_*") : prend le plus proche encore tradable."""
+        now = time.time()
+        candidates = [s for s in mt5.symbols_get(group=pattern) or ()
+                      if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL
+                      and (not s.expiration_time or s.expiration_time > now)]
+        if not candidates:
+            log.error("Aucun contrat tradable pour %s chez le broker", pattern)
+            return None
+        best = min(candidates, key=lambda s: s.expiration_time or float("inf")).name
+        if self._last_contract.get(pattern) != best:
+            log.info("Contrat utilisé pour %s : %s", pattern, best)
+            self._last_contract[pattern] = best
+        return best
 
     @staticmethod
     def _round_volume(volume: float, info) -> float:

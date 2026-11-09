@@ -66,7 +66,7 @@ Pour un canal qui demande « À TP1 : Half + BE » (comme `🔴 SELL NASDAQ / PE
 - `shift_levels_to_broker = true` : si le canal annonce 26850 et que ton broker cote 26860, SL et TP sont
   décalés de +10. Les distances (et donc le risque) restent celles du signal.
 
-Pense à `[symbol_map] NAS100 = "..."` avec le nom exact chez ton broker (USTEC, US100, NAS100.cash…).
+Pense à `[symbol_map] NAS100 = "..."` avec le nom exact chez ton broker (USTEC, US100_*, NAS100.cash…).
 
 ## Sécurités intégrées
 
@@ -82,6 +82,10 @@ Pense à `[symbol_map] NAS100 = "..."` avec le nom exact chez ton broker (USTEC,
 
 Si ton broker nomme l'or `XAUUSD.m` ou `GOLD`, utilise `symbol_suffix = ".m"` ou
 `[symbol_map] XAUUSD = "GOLD"`. Le nom exact apparaît dans la fenêtre *Market Watch* de MT5.
+
+Pour les contrats à échéance comme `US100_Z6` (Z = décembre, 6 = 2026), écris `NAS100 = "US100_*"` :
+le copieur ouvre toujours sur le contrat le plus proche encore tradable et passe tout seul au suivant
+(`US100_H7`…). « CLOSE NASDAQ » ferme aussi les positions restées sur l'ancien contrat.
 
 ## Limites connues
 

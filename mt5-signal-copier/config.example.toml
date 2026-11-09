@@ -12,7 +12,8 @@ dry_run = true                 # true = simulation (order_check), false = ordres
 magic = 20261109               # identifie les positions ouvertes par le copieur
 lot_mode = "risk"              # "fixed" (fixed_lot) ou "risk" (% du solde risqué jusqu'au SL)
 fixed_lot = 0.01
-risk_percent = 1.0
+risk_percent = 10.0                # ⚠ 10 % par trade : 5 pertes de suite = environ -41 % du compte
+                               # (le canal conseille 1 %). Garde max_lot comme garde-fou.
 max_lot = 1.0                  # plafond de sécurité
 require_sl = true              # refuse les signaux sans stop loss
 multi_tp = "split"             # "split" : 1 position par TP | "first" | "last"
@@ -29,9 +30,11 @@ extra_symbols = []             # symboles non standards à reconnaître, ex. ["B
 state_file = "trades.json"
 
 [symbol_map]
-# Nom canonique = nom chez ton broker (prioritaire sur symbol_suffix)
+# Nom canonique = nom chez ton broker (prioritaire sur symbol_suffix).
+# Contrats à échéance (US100_Z6, US100_H7...) : mets une étoile, le copieur
+# prend tout seul le contrat en cours et passe au suivant à l'échéance.
+NAS100 = "US100_*"
 # XAUUSD = "GOLD"
-# NAS100 = "USTEC"
 
 [aliases]
 # Mot utilisé par ton canal = symbole canonique

@@ -19,6 +19,7 @@ class FakeMT5:
     ORDER_FILLING_FOK, ORDER_FILLING_IOC, ORDER_FILLING_RETURN = 0, 1, 2
     ORDER_TIME_GTC = 0
     DEAL_ENTRY_OUT, DEAL_REASON_TP = 1, 5
+    SYMBOL_TRADE_MODE_CLOSEONLY, SYMBOL_TRADE_MODE_FULL = 3, 4
 
     def __init__(self):
         self.sent, self.positions, self.deals, self.next_ticket = [], [], {}, 1000
@@ -29,6 +30,12 @@ class FakeMT5:
     def symbol_select(self, s, _): return s in self.ticks
     def symbol_info(self, s): return NS(**{**vars(self.info), "name": s})
     def symbol_info_tick(self, s): return self.ticks[s]
+    def symbols_get(self, group):
+        return [NS(name="US100_Z5", trade_mode=4, expiration_time=1),               # expiré
+                NS(name="US100_Z6", trade_mode=3, expiration_time=4_000_000_000),  # clôture seule
+                NS(name="US100_H7", trade_mode=4, expiration_time=4_100_000_000),
+                NS(name="US100_M7", trade_mode=4, expiration_time=4_200_000_000)]
+
     def history_deals_get(self, position): return self.deals.get(position, [])
     def account_info(self): return NS(balance=10_000.0)
     # 1 lot de XAUUSD = 100 onces (1 $ de mouvement = 100 $) ; 1 lot de NAS100 = 1 $ par point
@@ -126,6 +133,20 @@ class ExecutorTest(unittest.TestCase):
         self.fake.deals[11] = [NS(entry=1, reason=4)]  # clôturé au SL
         self.ex.manage()
         self.assertEqual(self.fake.sent, [])
+
+
+    def test_futures_rollover_picks_current_contract(self):
+        self.fake.ticks["US100_H7"] = self.fake.ticks["NAS100"]
+        self.ex.symbol_map = {"NAS100": "US100_*"}
+        self.ex.handle(parse_signal("SELL NASDAQ SL 26960 TP 26750"), "t1")
+        self.assertEqual({r["symbol"] for r in self.fake.sent}, {"US100_H7"})
+        # « CLOSE NASDAQ » doit aussi fermer une position restée sur l'ancien contrat
+        self.fake.sent.clear()
+        self.fake.ticks["US100_Z6"] = self.fake.ticks["NAS100"]
+        self.fake.positions = [NS(ticket=5, symbol="US100_Z6", volume=0.1, type=1, magic=self.ex.magic, comment="x"),
+                               NS(ticket=6, symbol="XAUUSD", volume=0.1, type=1, magic=self.ex.magic, comment="y")]
+        self.ex.handle(parse_signal("CLOSE NASDAQ"), "t2")
+        self.assertEqual([r["position"] for r in self.fake.sent], [5])
 
 
 if __name__ == "__main__":
