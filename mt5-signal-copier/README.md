@@ -15,7 +15,20 @@ Canal Telegram ──► copier.py ──► signal_parser.py ──► mt5_exec
 - **Python 3.11+**.
 - Des clés API Telegram (`api_id`, `api_hash`) : https://my.telegram.org → *API development tools*.
 
-## Installation
+## Installation rapide sur un VPS Windows (même depuis un téléphone)
+
+1. Connecte-toi au VPS avec l'app **Windows App** (Microsoft) : adresse IP, utilisateur, mot de passe fournis par l'hébergeur.
+2. Ouvre **PowerShell** (menu Démarrer → tape « powershell ») et colle cette ligne :
+   ```powershell
+   irm https://raw.githubusercontent.com/2R91/StartUp/claude/copy-trading-signals-mt5-0cicqj/mt5-signal-copier/install_windows.ps1 | iex
+   ```
+   Elle installe Python, le copieur, ses dépendances et MetaTrader 5, puis crée 4 raccourcis sur le bureau.
+   Relancer la même ligne plus tard met le copieur à jour sans toucher à `config.toml`.
+3. Dans MT5 : *Fichier → Connexion à un compte de trading*, puis active **Algo Trading**.
+4. Raccourci **Modifier la config** → remplis `[telegram]`, puis **Lister mes canaux Telegram**,
+   **Tester un signal**, et enfin **Lancer le copieur**.
+
+## Installation manuelle
 
 ```bat
 cd mt5-signal-copier
